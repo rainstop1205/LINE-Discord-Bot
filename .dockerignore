@@ -1,0 +1,17 @@
+.git/
+.gitignore
+.env
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.db
+*.sqlite3
+*.log
+.DS_Store
+.vscode/
+.idea/
+.env.example
+README.md
+cloudbuild.yaml
+docker-compose.yml

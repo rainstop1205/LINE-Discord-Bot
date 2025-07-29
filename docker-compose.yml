@@ -1,0 +1,22 @@
+services:
+  line-dc-bot:
+    build: .
+    image: line-dc-bot:latest # name:tag
+    ports:
+      - "8080:8080"
+    container_name: line-dc-bot
+    env_file:
+      - .env
+    volumes:
+      - ./logs:/app/logs
+    restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # redis:
+  #   image: redis:alpine
+  #   container_name: discord-redis
+  #   restart: unless-stopped
