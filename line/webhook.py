@@ -2,20 +2,15 @@ import os
 import json
 import aiohttp
 from aiohttp import web
-import requests
+from line.api import get_user_display_name, download_message_content
 from user_whitelist import user_prefix_whitelist
 from logger import logger
 
 DISCORD_WEBHOOK_URL = os.getenv("DISCORD_WEBHOOK_URL")
-LINE_CHANNEL_ACCESS_TOKEN = os.getenv("LINE_CHANNEL_ACCESS_TOKEN")
 MAX_DISCORD_FILESIZE = 8 * 1024 * 1024  # 8MB
-user_cache = {}
 
-if not DISCORD_WEBHOOK_URL or not LINE_CHANNEL_ACCESS_TOKEN:
-    raise RuntimeError("Missing required environment variables: DISCORD_WEBHOOK_URL or LINE_CHANNEL_ACCESS_TOKEN")
-
-def get_line_auth_headers():
-    return {"Authorization": f"Bearer {LINE_CHANNEL_ACCESS_TOKEN}"}
+if not DISCORD_WEBHOOK_URL:
+    raise RuntimeError("Missing required environment variable: DISCORD_WEBHOOK_URL")
 
 async def post_to_discord(payload=None, files=None):
     try:
@@ -38,43 +33,6 @@ async def post_to_discord(payload=None, files=None):
         logger.exception(f"⚠️ Discord post exception: {e}")
         return False
 
-async def get_user_display_name(user_id):
-    if user_id in user_cache:
-        return user_cache[user_id]
-
-    prefix = user_id[:6]
-    if prefix in user_prefix_whitelist:
-        display_name = user_prefix_whitelist[prefix]
-        user_cache[user_id] = display_name
-        return display_name
-
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api.line.me/v2/bot/profile/{user_id}", headers=get_line_auth_headers()) as resp:
-                if resp.status == 200:
-                    profile = await resp.json()
-                    display_name = profile.get("displayName") or f"(unknown user {prefix})"
-                    user_cache[user_id] = display_name
-                    return display_name
-                else:
-                    logger.warning(f"⚠️ Failed to get displayName for {user_id}: {resp.status}")
-    except Exception as e:
-        logger.exception(f"⚠️ Exception getting displayName for {user_id}: {e}")
-
-    return f"(user {prefix})"
-
-async def download_line_content(message_id):
-    try:
-        async with aiohttp.ClientSession() as session:
-            async with session.get(f"https://api-data.line.me/v2/bot/message/{message_id}/content", headers=get_line_auth_headers()) as resp:
-                if resp.status == 200:
-                    return await resp.read()
-                else:
-                    logger.error(f"⚠️ Failed to download content: {resp.status}")
-    except Exception as e:
-        logger.exception(f"⚠️ Exception downloading content: {e}")
-    return None
-
 async def handle_text(user_id, text):
     display_name = await get_user_display_name(user_id)
     await post_to_discord({"content": f"👤 {display_name}：{text}"})
@@ -89,7 +47,7 @@ async def handle_sticker(user_id, sticker_id):
     await post_to_discord(payload)
 
 async def handle_media(user_id, message_id, media_type="image"):
-    content = await download_line_content(message_id)
+    content = await download_message_content(message_id)
     if not content:
         return
 
